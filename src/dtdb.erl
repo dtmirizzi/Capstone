@@ -2,7 +2,7 @@
 %% Database Node
 %% By DT Mirizzi
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--module(dtdb_node).
+-module(dtdb).
 -behavior(gen_server).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -34,8 +34,9 @@ delete(Key)->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Callback src
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-init(Args)->
+init(_Args)->
   Empty_Map = maps:new(),
+  io:write(Empty_Map),
   {ok, Empty_Map}.
 handle_call({store, Key, Value}, _From, State)->
   NewState = maps:put(Key, Value, State),
