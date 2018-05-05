@@ -9,14 +9,15 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API Exports
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--export([get_state/0, delete/1, find/1, store/2]).
+-export([delete/1, deleteAsync/1, find/1, findAsync/1,
+	 get_state/0, store/2, storeAsync/2]).
 
 -export([start_link/0, stop/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Callback Exports
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--export([handle_call/3, handle_cast/2, init/1,
+-export([handle_call/3, handle_cast/3, init/1,
 	 terminate/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -36,7 +37,13 @@ find(Key) -> gen_server:call(dtdb, {find, Key}).
 
 delete(Key) -> gen_server:call(dtdb, {delete, Key}).
 
-get_state() -> gen_server:call(dtdb, {get_state}).
+storeAsync(Key, Value) ->
+    gen_server:cast(dtdb, {store, Key, Value}).
+
+deleteAsync(Key) ->
+    gen_server:cast(dtdb, {delete, Key}).
+
+get_state() -> gen_server:cast(dtdb, {get_state}).
 
 stop() -> gen_server:stop(dtdb).
 
@@ -51,10 +58,8 @@ init(_Args) ->
 handle_call({store, Key, Value}, _From, State) ->
     NewState = maps:put(Key, Value, State),
     {reply, ok, NewState};
-
 handle_call({get_state}, _From, State) ->
     {reply, ok, State};
-
 handle_call({find, Key}, _From, State) ->
     Value = try {ok, [V]} = maps:find(Key, State), V catch
 	      error -> false
@@ -64,7 +69,12 @@ handle_call({delete, Key}, _From, State) ->
     NewState = maps:remove(Key, State),
     {reply, ok, NewState}.
 
-handle_cast(_Request, State) -> {reply, ok, State}.
+handle_cast({store, Key, Value}, _From, State) ->
+    NewState = maps:put(Key, Value, State),
+    {noreply, ok, NewState};
+handle_cast({delete, Key}, _From, State) ->
+    NewState = maps:remove(Key, State),
+    {noreply, ok, NewState}.
 
 terminate(_Reason, _State) ->
     %remove node from gobal list

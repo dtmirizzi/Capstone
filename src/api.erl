@@ -2,7 +2,7 @@
 %% Master node
 %% By DT Mirizzi
 %% No State is currently being saved in this module but may be used later
-%% to store api keys or can be deprecated/ignored 
+%% to store api keys or can be deprecated/ignored
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -module(api).
 
@@ -42,24 +42,50 @@ stop() -> gen_server:stop(api).
 init(Args) -> Empty_Map = maps:new(), {ok, Empty_Map}.
 
 handle_call({store, Key, Value}, _From, State) ->
-    NewState = maps:put(Key, Value, State),
-    {reply, ok, NewState};
+	Pid = spawn(?MODULE, storeInternal, [Key, Value]),
+	{reply, ok, State}.
 handle_call({find, Key}, _From, State) ->
-    Value = try {ok, [V]} = maps:find(Key, State), V catch
-	      error -> false
-	    end,
-    {reply, Value, State};
+    {_, Results} = findInternal(Key),
+    {reply, Results, State};
 handle_call({delete, Key}, _From, State) ->
-    NewState = maps:remove(Key, State),
-    {reply, ok, NewState}.
+	Pid = spawn(?MODULE, deleteInternal, [Key]),
+	{reply, ok, State}.
 
-handle_cast(_Request, State) -> {reply, ok, State}.
+handle_cast(_Request, State) -> {reply, error, State}.
 
 terminate(_Reason, _State) ->
-    %remove node from gobal list
-    global:unregister_name(node()).
+	{ok}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Calback helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-store()
+storeInternal(Key, Value)->
+	storeInternal(global:registered_names(), Key, Value, length(global:registered_names())).
+storeInternal([], _K, _V, _GraphSz)->
+	{ok};
+storeInternal([Node|Nodes], Key, Value, GraphSz)->
+	if
+		GraphSz<=2 ->
+			gen_server:cast({gobal, Node}, {store, Key, Value}),
+			storeInternal(Nodes, Key, Value, GraphSz -1)
+	end,
+	if
+		 rem 2 == 0 ->
+			gen_server:cast({global,Node}, {delete, Key, Value}),
+			storeInternal(Nodes, Key, Value, GraphSz -1)
+	end.
+
+deleteInternal(Key)->
+	storeInternal(global:registered_names(), Key).
+deleteInternal([], _K)->
+	{ok};
+deleteInternal([Node|Nodes], Key)->
+	gen_server:cast({global, Node}, {delete, Key}).
+
+findInternal(Key)->
+	storeInternal(global:registered_names(), Key, []).
+findInternal([], _K, Return)->
+	{ok, Return};
+findInternal([Node|Nodes], Key, Return)->
+	{_, Reply} = gen_server:call({global, Node}, {delete, Key}),
+	findInternal(Nodes, Key, lists:append(Return, Reply)).
